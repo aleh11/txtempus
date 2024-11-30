@@ -4,6 +4,8 @@
 #include <fcntl.h>  // File control definitions
 #include <termios.h> // POSIX terminal control definitions
 #include <unistd.h>  // UNIX standard function definitions
+#include <chrono>    // For time management
+#include <thread>    // For sleep_for
 
 using namespace std;
 
@@ -28,18 +30,30 @@ int main() {
     options.c_cflag &= ~CSTOPB;         // 1 stop bit
     tcsetattr(serialPort, TCSANOW, &options);
 
-    cout << "Reading GPS data..." << endl;
+    cout << "Reading GPS data every 30 seconds..." << endl;
 
     char buffer[256];
     while (true) {
-        int bytesRead = read(serialPort, buffer, sizeof(buffer) - 1);
+        string gpsData = ""; // Buffer to store a complete NMEA sentence
 
-        if (bytesRead > 0) {
-            buffer[bytesRead] = '\0'; // Null-terminate the buffer
-            cout << buffer;          // Print the raw GPS data
-        } else {
-            usleep(100000); // Sleep for 100 ms
+        // Read data until a newline (end of an NMEA sentence)
+        while (true) {
+            int bytesRead = read(serialPort, buffer, 1); // Read one byte at a time
+            if (bytesRead > 0) {
+                if (buffer[0] == '\n') {
+                    break; // End of NMEA sentence
+                }
+                gpsData += buffer[0]; // Append byte to gpsData
+            }
         }
+
+        // Check if the sentence is valid and display it
+        if (!gpsData.empty() && gpsData.find("$GPGGA") != string::npos) { // Filter for GPGGA
+            cout << "GPS Reading: " << gpsData << endl;
+        }
+
+        // Wait for 30 seconds before the next reading
+        this_thread::sleep_for(chrono::seconds(30));
     }
 
     close(serialPort);
